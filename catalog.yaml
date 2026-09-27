@@ -1,0 +1,21 @@
+# Custom MCP catalog entry for this server, in the format the Docker MCP
+# Gateway / Toolkit expects for locally-added servers.
+# See: https://docs.docker.com/ai/mcp-catalog-and-toolkit/cli/
+
+registry:
+  hardened-demo:
+    description: "Minimal demo MCP server migrated to Docker Hardened Images"
+    title: "Hardened Demo Server"
+    type: server
+    dateAdded: "2026-09-27T00:00:00Z"
+    image: hardened-demo-server:latest
+    tools:
+      - name: word_count
+      - name: server_time
+    metadata:
+      category: productivity
+      tags:
+        - demo
+        - docker-hardened-images
+      license: MIT
+      owner: local
