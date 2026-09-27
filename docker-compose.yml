@@ -1,0 +1,39 @@
+# Runs the demo server behind the Docker MCP Gateway so it can be added to
+# Claude Desktop, Claude Code, or any other MCP client the Gateway supports.
+#
+# Usage:
+#   docker compose up -d --build
+#
+# Then add the gateway to your MCP client config (see README.md "Wiring into
+# the Docker MCP Gateway").
+
+services:
+  hardened-demo-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.dhi
+    environment:
+      - PORT=3000
+    expose:
+      - "3000"
+    networks:
+      - mcpnet
+
+  mcp-gateway:
+    image: docker/mcp-gateway
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ~/.docker/mcp:/mcp
+    command:
+      - --port=8080
+      - --transport=sse
+      - --servers=hardened-demo=http://hardened-demo-server:3000/mcp
+    depends_on:
+      - hardened-demo-server
+    networks:
+      - mcpnet
+
+networks:
+  mcpnet:

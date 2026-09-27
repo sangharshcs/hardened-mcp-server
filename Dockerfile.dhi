@@ -1,0 +1,33 @@
+# Migrated to Docker Hardened Images (DHI) - the "after" side of the
+# migration described in README.md.
+#
+# Requirements before building this file:
+#   1. A free Docker ID (same credentials as Docker Hub)
+#   2. docker login dhi.io
+#
+# Tag names below (24-alpine3.23) match Docker's published Node.js DHI
+# migration example and Backstage migration guide at the time this repo was
+# written. DHI tags are updated on Docker's own schedule - confirm current
+# tags in the live catalog before building:
+# https://docs.docker.com/dhi/migration/examples/node/
+
+# ---- Build stage: install dependencies ----
+FROM dhi.io/node:24-alpine3.23 AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY src/ ./src/
+
+# ---- Runtime stage: only the built artifacts, nothing else ----
+FROM dhi.io/node:24-alpine3.23
+WORKDIR /app
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/src ./src
+COPY --from=build --chown=node:node /app/package.json ./package.json
+
+ENV PORT=3000
+EXPOSE 3000
+
+USER node
+
+CMD ["node", "src/server.js"]
