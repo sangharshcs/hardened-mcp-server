@@ -1,0 +1,110 @@
+name: build-and-test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-dockerfiles:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint Dockerfile (standard)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+
+      - name: Lint Dockerfile.dhi
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile.dhi
+
+  build-and-smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build standard image
+        run: docker build -t hardened-demo-server:standard -f Dockerfile .
+
+      - name: Report image size
+        run: docker images hardened-demo-server:standard --format "{{.Repository}}:{{.Tag}}  {{.Size}}"
+
+      - name: Run container
+        run: docker run -d --name demo -p 3000:3000 hardened-demo-server:standard
+
+      - name: Wait for health endpoint
+        run: |
+          for i in $(seq 1 15); do
+            if curl -fsS http://localhost:3000/health; then exit 0; fi
+            sleep 2
+          done
+          echo "Server did not become healthy"
+          docker logs demo
+          exit 1
+
+      - name: Call the MCP endpoint over Streamable HTTP
+        run: |
+          curl -sS -X POST http://localhost:3000/mcp \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json, text/event-stream" \
+            -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1.0"}}}' \
+            | tee /tmp/init-response.json
+          grep -q '"jsonrpc"' /tmp/init-response.json
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f demo || true
+
+  # Only runs when DOCKER_PAT is set (skips cleanly on forks / PRs from
+  # outside contributors, since GitHub withholds secrets from those runs).
+  # This is the job that actually builds Dockerfile.dhi and produces the
+  # size/CVE comparison referenced in the README and any article based on
+  # this repo - re-run it periodically, since both images get repatched
+  # over time and the numbers will drift.
+  build-and-scan-dhi:
+    runs-on: ubuntu-latest
+    if: ${{ secrets.DOCKER_PAT != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to dhi.io
+        uses: docker/login-action@v4
+        with:
+          registry: dhi.io
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PAT }}
+
+      - name: Build standard image
+        run: docker build -t hardened-demo-server:standard -f Dockerfile .
+
+      - name: Build DHI image
+        run: docker build -t hardened-demo-server:dhi -f Dockerfile.dhi .
+
+      - name: Compare image sizes
+        run: docker images hardened-demo-server --format "{{.Tag}}\t{{.Size}}"
+
+      - name: Scout - CVEs in standard image
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: hardened-demo-server:standard
+          only-severities: critical,high
+
+      - name: Scout - CVEs in DHI image
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: hardened-demo-server:dhi
+          only-severities: critical,high
+
+      - name: Scout - compare DHI against standard
+        uses: docker/scout-action@v1
+        with:
+          command: compare
+          image: hardened-demo-server:dhi
+          to: hardened-demo-server:standard
+          ignore-unchanged: true
+          only-severities: critical,high
