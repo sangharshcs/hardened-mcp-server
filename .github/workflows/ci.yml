@@ -83,6 +83,9 @@ jobs:
     needs: check-secrets
     runs-on: ubuntu-latest
     if: needs.check-secrets.outputs.docker_pat_set == 'true'
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
