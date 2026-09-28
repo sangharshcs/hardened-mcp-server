@@ -64,9 +64,25 @@ jobs:
   # size/CVE comparison referenced in the README and any article based on
   # this repo - re-run it periodically, since both images get repatched
   # over time and the numbers will drift.
-  build-and-scan-dhi:
+  check-secrets:
     runs-on: ubuntu-latest
-    if: ${{ secrets.DOCKER_PAT != '' }}
+    outputs:
+      docker_pat_set: ${{ steps.check.outputs.defined }}
+    steps:
+      - id: check
+        env:
+          DOCKER_PAT: ${{ secrets.DOCKER_PAT }}
+        run: |
+          if [ -n "$DOCKER_PAT" ]; then
+            echo "defined=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "defined=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-and-scan-dhi:
+    needs: check-secrets
+    runs-on: ubuntu-latest
+    if: needs.check-secrets.outputs.docker_pat_set == 'true'
     steps:
       - uses: actions/checkout@v4
 
