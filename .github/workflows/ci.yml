@@ -108,6 +108,8 @@ jobs:
           command: cves
           image: hardened-demo-server:standard
           only-severities: critical,high
+          dockerhub-user: ${{ secrets.DOCKER_USER }}
+          dockerhub-password: ${{ secrets.DOCKER_PAT }}
 
       - name: Scout - CVEs in DHI image
         uses: docker/scout-action@v1
@@ -115,6 +117,8 @@ jobs:
           command: cves
           image: hardened-demo-server:dhi
           only-severities: critical,high
+          dockerhub-user: ${{ secrets.DOCKER_USER }}
+          dockerhub-password: ${{ secrets.DOCKER_PAT }}
 
       - name: Scout - compare DHI against standard
         uses: docker/scout-action@v1
@@ -124,3 +128,5 @@ jobs:
           to: hardened-demo-server:standard
           ignore-unchanged: true
           only-severities: critical,high
+          dockerhub-user: ${{ secrets.DOCKER_USER }}
+          dockerhub-password: ${{ secrets.DOCKER_PAT }}
