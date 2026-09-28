@@ -102,6 +102,13 @@ jobs:
       - name: Build DHI image
         run: docker build -t hardened-demo-server:dhi -f Dockerfile.dhi .
 
+      - name: Print full image digests (local image ID, not a registry manifest digest)
+        run: |
+          echo "Standard image ID:"
+          docker inspect --format='{{.Id}}' hardened-demo-server:standard
+          echo "DHI image ID:"
+          docker inspect --format='{{.Id}}' hardened-demo-server:dhi
+
       - name: Compare image sizes
         run: docker images hardened-demo-server --format "{{.Tag}}\t{{.Size}}"
 
