@@ -49,13 +49,17 @@ docker build -t hardened-demo-server:dhi -f Dockerfile.dhi .
 
 ### Comparing the two images: real numbers from this repo's own CI
 
-CI builds both images and runs [Docker Scout](https://docs.docker.com/scout/) on every push where the `DOCKER_PAT` secret is configured. Here's an actual run: [build-and-scan-dhi, run #8](https://github.com/sangharshcs/hardened-mcp-server/actions/runs/36361828705/job/108740503469).
+CI builds both images and runs [Docker Scout](https://docs.docker.com/scout/) on every push where the `DOCKER_PAT` secret is configured. Here's an actual run: [build-and-scan-dhi](https://github.com/sangharshcs/hardened-mcp-server/actions/runs/36364331272/job/108747636722) (Sept 28, 2026).
 
 | | Standard (`node:24-trixie-slim`) | DHI (`dhi.io/node:24-alpine3.23`) |
 |---|---|---|
-| Image size | 104 MB | 56 MB (**-47 MB**) |
+| Image size (Docker Scout) | 104 MB | 56 MB (**-47 MB**) |
 | Packages | 376 | 132 (**-244**) |
 | Vulnerabilities | 0 Critical / 6 High / 6 Medium / 24 Low | 0 / 0 / 0 / 0 |
+
+Local image IDs from that run (`docker inspect --format='{{.Id}}'` — not a registry manifest digest, since neither image is pushed anywhere): `sha256:4652bbc1ee905a38089009e6893cc7eb8ce946445f6bfacbd3545016b3323d18` (standard), `sha256:69b077c4ca9ec417e16c40f06ad71487a986657cc2088376f5f61a31a1b4d33f` (hardened).
+
+**A discrepancy worth knowing about before you re-check these numbers yourself:** a plain `docker images` query against the same two images reports different, larger sizes — 255 MB (standard) and 135 MB (hardened) — because `docker images` reports local on-disk size including uncompressed layer history, while Docker Scout calculates size differently. Both numbers are real; they're just different metrics. State which tool produced a size figure, since the two aren't interchangeable.
 
 What actually got removed: the Debian userland the app never touches at runtime (`bash`, `systemd`, `login`/`passwd`/`shadow`, `pam`, `sysvinit`, `apt`, `dpkg`), plus - less obviously - the **entire npm CLI's own internal toolchain** (`@npmcli/*`, `pacote`, `npm-registry-fetch`, and dozens more) that ships inside `node:24-trixie-slim` by default, even though this server never invokes `npm` at runtime; it only ever runs `node src/server.js`.
 
@@ -110,7 +114,7 @@ Three jobs run on every push and pull request:
 
 - **`lint-dockerfiles`** - lints both `Dockerfile` and `Dockerfile.dhi` with `hadolint`.
 - **`build-and-smoke-test`** - builds the standard image, starts it, waits for `/health`, and sends a real `initialize` call to `/mcp` over Streamable HTTP to confirm the server responds with a well-formed JSON-RPC message. Runs unconditionally, no credentials needed.
-- **`check-secrets`** + **`build-and-scan-dhi`** - builds `Dockerfile.dhi` (requires an authenticated `docker login dhi.io`) and runs Docker Scout to produce the size/CVE comparison above. Gated on whether the `DOCKER_PAT` repository secret is set: a `check-secrets` job resolves the secret through a step's `env:` and exposes the result as a job output, since GitHub Actions doesn't support referencing the `secrets` context directly inside a job-level `if:`. On forks or PRs from outside contributors where the secret isn't available, this job's steps show as skipped rather than failing.
+- **`check-secrets`** + **`build-and-scan-dhi`** - builds `Dockerfile.dhi` (requires an authenticated `docker login dhi.io`) and runs Docker Scout to produce the size/CVE comparison above, plus prints the full local image ID of each build. Gated on whether the `DOCKER_PAT` repository secret is set: a `check-secrets` job resolves the secret through a step's `env:` and exposes the result as a job output, since GitHub Actions doesn't support referencing the `secrets` context directly inside a job-level `if:`. On forks or PRs from outside contributors where the secret isn't available, this job's steps show as skipped rather than failing.
 
 ## Limitations of this repo
 
