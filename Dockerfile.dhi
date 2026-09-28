@@ -12,7 +12,8 @@
 # https://docs.docker.com/dhi/migration/examples/node/
 
 # ---- Build stage: install dependencies ----
-FROM dhi.io/node:24-alpine3.23 AS build
+# The -dev tag includes a shell and toolchain; the plain tag below does not.
+FROM dhi.io/node:24-alpine3.23-dev AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev

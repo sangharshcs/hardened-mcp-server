@@ -64,9 +64,28 @@ jobs:
   # size/CVE comparison referenced in the README and any article based on
   # this repo - re-run it periodically, since both images get repatched
   # over time and the numbers will drift.
-  build-and-scan-dhi:
+  check-secrets:
     runs-on: ubuntu-latest
-    if: ${{ secrets.DOCKER_PAT != '' }}
+    outputs:
+      docker_pat_set: ${{ steps.check.outputs.defined }}
+    steps:
+      - id: check
+        env:
+          DOCKER_PAT: ${{ secrets.DOCKER_PAT }}
+        run: |
+          if [ -n "$DOCKER_PAT" ]; then
+            echo "defined=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "defined=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-and-scan-dhi:
+    needs: check-secrets
+    runs-on: ubuntu-latest
+    if: needs.check-secrets.outputs.docker_pat_set == 'true'
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
@@ -92,6 +111,8 @@ jobs:
           command: cves
           image: hardened-demo-server:standard
           only-severities: critical,high
+          dockerhub-user: ${{ secrets.DOCKER_USER }}
+          dockerhub-password: ${{ secrets.DOCKER_PAT }}
 
       - name: Scout - CVEs in DHI image
         uses: docker/scout-action@v1
@@ -99,6 +120,8 @@ jobs:
           command: cves
           image: hardened-demo-server:dhi
           only-severities: critical,high
+          dockerhub-user: ${{ secrets.DOCKER_USER }}
+          dockerhub-password: ${{ secrets.DOCKER_PAT }}
 
       - name: Scout - compare DHI against standard
         uses: docker/scout-action@v1
@@ -108,3 +131,5 @@ jobs:
           to: hardened-demo-server:standard
           ignore-unchanged: true
           only-severities: critical,high
+          dockerhub-user: ${{ secrets.DOCKER_USER }}
+          dockerhub-password: ${{ secrets.DOCKER_PAT }}
