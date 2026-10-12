@@ -12,6 +12,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dhi
+    # Must match the `image:` field in catalog.yaml, which is how the MCP
+    # Gateway's custom-catalog mechanism locates this image.
+    image: hardened-demo-server:latest
     environment:
       - PORT=3000
     expose:
