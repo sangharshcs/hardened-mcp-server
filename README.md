@@ -110,11 +110,12 @@ Then point your MCP client at the Gateway, the same way you would for any Docker
 
 ## What CI actually checks
 
-Three jobs run on every push and pull request:
+Four jobs run on every push and pull request:
 
 - **`lint-dockerfiles`** - lints both `Dockerfile` and `Dockerfile.dhi` with `hadolint`.
 - **`build-and-smoke-test`** - builds the standard image, starts it, waits for `/health`, and sends a real `initialize` call to `/mcp` over Streamable HTTP to confirm the server responds with a well-formed JSON-RPC message. Runs unconditionally, no credentials needed.
-- **`check-secrets`** + **`build-and-scan-dhi`** - builds `Dockerfile.dhi` (requires an authenticated `docker login dhi.io`) and runs Docker Scout to produce the size/CVE comparison above, plus prints the full local image ID of each build. Gated on whether the `DOCKER_PAT` repository secret is set: a `check-secrets` job resolves the secret through a step's `env:` and exposes the result as a job output, since GitHub Actions doesn't support referencing the `secrets` context directly inside a job-level `if:`. On forks or PRs from outside contributors where the secret isn't available, this job's steps show as skipped rather than failing.
+- **`check-secrets`** - resolves whether the `DOCKER_PAT` repository secret is set through a step's `env:` and exposes the result as a job output, since GitHub Actions doesn't support referencing the `secrets` context directly inside a job-level `if:`. Gates the next job.
+- **`build-and-scan-dhi`** - builds `Dockerfile.dhi` (requires an authenticated `docker login dhi.io`), then actually runs the resulting image the same way `build-and-smoke-test` does for the standard one: starts the container, waits for `/health`, and sends a real `initialize` call to `/mcp`. Only after that does it run Docker Scout to produce the size/CVE comparison above and print the full local image ID of each build. On forks or PRs from outside contributors where the secret isn't available, this job's steps show as skipped rather than failing.
 
 ## Limitations of this repo
 
