@@ -102,6 +102,32 @@ jobs:
       - name: Build DHI image
         run: docker build -t hardened-demo-server:dhi -f Dockerfile.dhi .
 
+      - name: Run DHI container
+        run: docker run -d --name demo-dhi -p 3000:3000 hardened-demo-server:dhi
+
+      - name: Wait for health endpoint (DHI)
+        run: |
+          for i in $(seq 1 15); do
+            if curl -fsS http://localhost:3000/health; then exit 0; fi
+            sleep 2
+          done
+          echo "DHI server did not become healthy"
+          docker logs demo-dhi
+          exit 1
+
+      - name: Call the MCP endpoint over Streamable HTTP (DHI)
+        run: |
+          curl -sS -X POST http://localhost:3000/mcp \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json, text/event-stream" \
+            -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1.0"}}}' \
+            | tee /tmp/dhi-init-response.json
+          grep -q '"jsonrpc"' /tmp/dhi-init-response.json
+
+      - name: Stop DHI container
+        if: always()
+        run: docker rm -f demo-dhi || true
+
       - name: Print full image digests (local image ID, not a registry manifest digest)
         run: |
           echo "Standard image ID:"
